@@ -1,0 +1,67 @@
+<idea-plugin>
+    <id>com.ccidea.plugin</id>
+    <name>ccidea</name>
+    <vendor email="banizhang@ulinkotech.com" url="https://github.com/foam/ccidea-plug">foam</vendor>
+
+    <description><![CDATA[
+        <h2>ccidea — Claude Code usage inside your IDE</h2>
+        <p>Reads Claude Code's local JSONL logs and surfaces token usage, cost, and the
+        5-hour Anthropic billing block burn rate inside the IDE — no remote API calls
+        except fetching the LiteLLM pricing JSON (cached locally with an offline fallback).</p>
+        <ul>
+            <li>Daily / Monthly / Sessions / Blocks tables with full input/output/cache breakdown</li>
+            <li>Stacked-bar charts (Lets-Plot) and a burn-rate time series with ETA-to-limit reference line</li>
+            <li>Live 5-hour billing block tracker on the status bar — % used, time left, cost</li>
+            <li>Cost computed from LiteLLM pricing JSON, with 1-hour cache priced at 2× the 5-min rate</li>
+            <li>Pattern recognition: top-N expensive sessions, model cache-hit ratio, hour-of-day heatmap, recommendations</li>
+            <li>Notifications at 80%, 95%, and 10 minutes before block reset</li>
+            <li>Auto refresh every 30s, file-watcher nudges between ticks</li>
+        </ul>
+        <p>Read-only — never modifies your <code>~/.claude</code> directory.</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <resource-bundle>messages.CcideaBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.ccidea.plugin.settings.CcideaSettings"/>
+        <applicationService serviceImplementation="com.ccidea.plugin.data.UsageDataLoader"/>
+        <applicationService serviceImplementation="com.ccidea.plugin.data.LoaderOffsetState"/>
+        <applicationService serviceImplementation="com.ccidea.plugin.pricing.PricingService"/>
+        <applicationService serviceImplementation="com.ccidea.plugin.blocks.BlockService"/>
+        <applicationService serviceImplementation="com.ccidea.plugin.service.AggregationService"/>
+        <applicationService serviceImplementation="com.ccidea.plugin.poller.PollerService"/>
+        <applicationService serviceImplementation="com.ccidea.plugin.notifications.CcideaNotifier"/>
+        <applicationService serviceImplementation="com.ccidea.plugin.patterns.PatternEngine"/>
+
+        <postStartupActivity implementation="com.ccidea.plugin.poller.CcideaStartupActivity"/>
+
+        <toolWindow id="Ccidea"
+                    anchor="right"
+                    icon="/icons/ccidea_13.svg"
+                    factoryClass="com.ccidea.plugin.ui.toolwindow.CcideaToolWindowFactory"/>
+
+        <statusBarWidgetFactory id="ccidea.statusBar"
+                                implementation="com.ccidea.plugin.ui.statusbar.CcideaStatusBarFactory"/>
+
+        <applicationConfigurable parentId="tools"
+                                 id="ccidea.settings"
+                                 displayName="ccidea"
+                                 instance="com.ccidea.plugin.ui.settings.CcideaConfigurable"/>
+
+        <notificationGroup id="ccidea.balloon"
+                           displayType="BALLOON"
+                           isLogByDefault="true"
+                           bundle="messages.CcideaBundle"
+                           key="notification.group.ccidea"/>
+    </extensions>
+
+    <actions>
+        <action id="Ccidea.Refresh"
+                class="com.ccidea.plugin.ui.toolwindow.RefreshAction"
+                icon="AllIcons.Actions.Refresh"
+                text="Refresh ccidea"
+                description="Re-read JSONL logs and refresh charts now"/>
+    </actions>
+</idea-plugin>

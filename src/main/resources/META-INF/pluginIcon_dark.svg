@@ -1,0 +1,8 @@
+<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="36" height="36" rx="8" fill="#263238"/>
+  <path d="M8 28 L8 22 L13 22 L13 28 Z" fill="#4FC3F7"/>
+  <path d="M15 28 L15 18 L20 18 L20 28 Z" fill="#81C784"/>
+  <path d="M22 28 L22 14 L27 14 L27 28 Z" fill="#FFB74D"/>
+  <path d="M29 28 L29 10 L34 10 L34 28 Z" fill="#BA68C8"/>
+  <text x="6" y="36" font-family="Helvetica, Arial, sans-serif" font-size="6" font-weight="700" fill="#ECEFF1">ccidea</text>
+</svg>
