@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.ccidea.plugin</id>
     <name>ccidea</name>
-    <vendor email="banizhang@ulinkotech.com" url="https://github.com/foam/ccidea-plug">foam</vendor>
+    <vendor email="banizhang@ulinkotech.com" url="https://github.com/FoamTomato/ccidea">FoamTomato</vendor>
 
     <description><![CDATA[
         <h2>ccidea — Claude Code usage inside your IDE</h2>
