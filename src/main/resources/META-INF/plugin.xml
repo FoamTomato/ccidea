@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>com.ccidea.plugin</id>
-    <name>ccidea</name>
+    <name>Ccode Stats</name>
     <vendor email="banizhang@ulinkotech.com" url="https://github.com/FoamTomato/ccidea">FoamTomato</vendor>
 
     <description><![CDATA[

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 — Marketplace fixes
+
+- Rename plugin from `ccidea` to `Ccode Stats` (Marketplace forbids "IDEA" in name).
+- Drop `untilBuild` upper bound (no magic 999 sentinel).
+- Sessions tab: sort by most recent activity by default; multi-select project filter via toolbar button + right-click menu.
+- Patterns tab: always show a usage overview row; broaden recommendation rules.
+- Blocks tab: snap burn-rate chart's "now" to minute granularity to stop flicker on idle refresh ticks.
+
 ## 0.3.0 — Patterns + polish (M3/M4)
 
 - Patterns tab: top-N expensive sessions, model cache-hit ratio bar, 7×24 hour-of-day heatmap, p95 outlier highlighting, rule-based recommendations.

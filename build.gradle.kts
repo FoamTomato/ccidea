@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.ccidea"
-version = "0.3.0"
+version = "0.3.1"
 
 repositories {
     mavenCentral()
@@ -55,7 +55,7 @@ intellijPlatform {
     pluginConfiguration {
         ideaVersion {
             sinceBuild.set("242")
-            untilBuild.set("999.*")
+            untilBuild.set(provider { null })
         }
         changeNotes.set(provider {
             // Pull the topmost ## section of CHANGELOG.md so the marketplace listing tracks releases.

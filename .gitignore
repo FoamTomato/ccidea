@@ -24,3 +24,4 @@ out/
 # Logs / local
 *.log
 local.properties
+.claude/
