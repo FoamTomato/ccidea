@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2 — Live tab shows all sources
+
+- 实时标签页默认显示所有来源（多个 IDE / CLI / Antigravity 等）的活动，不再只显示当前 IDE 项目。
+- 实时表格新增「项目」列，方便区分不同来源的会话。
+- 工具栏新增「仅当前项目」复选框，需要旧行为时可勾选。
+- 概览行展示当前作用域：`全部来源 · N 个项目` 或 `项目名`。
+
 ## 0.3.1 — Marketplace fixes
 
 - Rename plugin from `ccidea` to `Ccode Stats` (Marketplace forbids "IDEA" in name).
