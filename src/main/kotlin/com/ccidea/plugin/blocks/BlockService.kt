@@ -18,12 +18,20 @@ import kotlin.concurrent.withLock
 class BlockService {
     private val lock = ReentrantLock()
     private val allEntries = mutableListOf<UsageEntry>()
+    private val seenKeys = HashSet<String>()
     @Volatile private var blocks: List<SessionBlock> = emptyList()
 
     fun ingest(delta: List<UsageEntry>) {
         if (delta.isEmpty()) return
         lock.withLock {
-            allEntries += delta
+            var added = 0
+            for (e in delta) {
+                if (seenKeys.add(e.dedupKey)) {
+                    allEntries += e
+                    added++
+                }
+            }
+            if (added == 0) return@withLock
             allEntries.sortBy { it.timestamp }
             val pricing = PricingService.getInstance()
             blocks = computeBlocks(allEntries, Instant.now()) { e -> pricing.costFor(e).total }
@@ -32,6 +40,7 @@ class BlockService {
 
     fun reset() = lock.withLock {
         allEntries.clear()
+        seenKeys.clear()
         blocks = emptyList()
     }
 
@@ -67,6 +76,20 @@ class BlockService {
     fun detectedTokenLimit(): Long {
         val finished = blocks.filter { !it.isGap && !it.isActive }
         return finished.maxOfOrNull { it.totalTokens } ?: 0L
+    }
+
+    fun detectedCostLimit(now: Instant = Instant.now()): Double {
+        val cutoff = now.minus(Duration.ofDays(30))
+        val recent = blocks.filter {
+            !it.isGap && !it.isActive && it.startTime >= cutoff &&
+                it.totalCost > 0.0 && it.totalTokens > 0L
+        }
+        if (recent.isEmpty()) return 0.0
+        val maxTokens = recent.maxOf { it.totalTokens }.toDouble()
+        // Per-block extrapolation: block_cost / (block_tokens / globalMaxTokens).
+        val extrapolated = recent.map { it.totalCost * maxTokens / it.totalTokens }.sorted()
+        val sample = if (extrapolated.size >= 10) extrapolated.subList(2, extrapolated.size - 2) else extrapolated
+        return sample.average()
     }
 
     fun projectedTokensForCurrent(now: Instant = Instant.now()): Long? {

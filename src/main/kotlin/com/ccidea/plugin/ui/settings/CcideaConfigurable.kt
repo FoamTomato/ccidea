@@ -52,6 +52,10 @@ class CcideaConfigurable : Configurable {
     private val resetSoon = JSpinner(SpinnerNumberModel(10, 0, 60, 1))
     private val claudeDir = JBTextField(30)
     private val customLimit = JBTextField(15)
+    private val weeklyTokenLimit = JBTextField(15)
+    private val weeklyCostLimit = JBTextField(15)
+    private val monthlyTokenLimit = JBTextField(15)
+    private val monthlyCostLimit = JBTextField(15)
     private val offline = JBCheckBox()
     private val showStatus = JBCheckBox()
     private val oneHourPremium = JBCheckBox()
@@ -87,6 +91,13 @@ class CcideaConfigurable : Configurable {
         box.add(row(ccideaMsg("settings.resetSoon"), resetSoon))
         box.add(row(ccideaMsg("settings.claudeDir"), claudeDir))
         box.add(row(ccideaMsg("settings.tokenLimit"), customLimit))
+
+        box.add(separator())
+        box.add(sectionTitle(ccideaMsg("settings.section.quota")))
+        box.add(row(ccideaMsg("settings.weeklyTokenLimit"), weeklyTokenLimit))
+        box.add(row(ccideaMsg("settings.weeklyCostLimit"), weeklyCostLimit))
+        box.add(row(ccideaMsg("settings.monthlyTokenLimit"), monthlyTokenLimit))
+        box.add(row(ccideaMsg("settings.monthlyCostLimit"), monthlyCostLimit))
 
         box.add(separator())
         box.add(sectionTitle(ccideaMsg("settings.section.toggles")))
@@ -148,6 +159,10 @@ class CcideaConfigurable : Configurable {
         resetSoon.value = s.resetSoonMinutes
         claudeDir.text = s.claudeConfigDir
         customLimit.text = if (s.customTokenLimit > 0) s.customTokenLimit.toString() else ""
+        weeklyTokenLimit.text = if (s.weeklyTokenLimit > 0) s.weeklyTokenLimit.toString() else ""
+        weeklyCostLimit.text = if (s.weeklyCostLimit > 0) s.weeklyCostLimit.toString() else ""
+        monthlyTokenLimit.text = if (s.monthlyTokenLimit > 0) s.monthlyTokenLimit.toString() else ""
+        monthlyCostLimit.text = if (s.monthlyCostLimit > 0) s.monthlyCostLimit.toString() else ""
         offline.isSelected = s.offlineOnly
         showStatus.isSelected = s.showStatusBarWidget
         oneHourPremium.isSelected = s.oneHourCachePremium
@@ -169,6 +184,10 @@ class CcideaConfigurable : Configurable {
         val selectedLang = (language.selectedItem as? LangItem)?.code ?: "system"
         val selectedUnit = (tokenUnit.selectedItem as? UnitItem)?.code ?: "smart"
         val parsedLimit = customLimit.text.trim().toLongOrNull()?.coerceAtLeast(0) ?: 0L
+        val parsedWeeklyTok = weeklyTokenLimit.text.trim().toLongOrNull()?.coerceAtLeast(0) ?: 0L
+        val parsedWeeklyCost = weeklyCostLimit.text.trim().toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0
+        val parsedMonthlyTok = monthlyTokenLimit.text.trim().toLongOrNull()?.coerceAtLeast(0) ?: 0L
+        val parsedMonthlyCost = monthlyCostLimit.text.trim().toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0
         return s.refreshSeconds != (refresh.value as Int) ||
             s.warnPercent != (warn.value as Int) ||
             s.errorPercent != (err.value as Int) ||
@@ -176,6 +195,10 @@ class CcideaConfigurable : Configurable {
             s.claudeConfigDir != claudeDir.text ||
             s.offlineOnly != offline.isSelected ||
             s.customTokenLimit != parsedLimit ||
+            s.weeklyTokenLimit != parsedWeeklyTok ||
+            s.weeklyCostLimit != parsedWeeklyCost ||
+            s.monthlyTokenLimit != parsedMonthlyTok ||
+            s.monthlyCostLimit != parsedMonthlyCost ||
             s.showStatusBarWidget != showStatus.isSelected ||
             s.uiLanguage != selectedLang ||
             s.oneHourCachePremium != oneHourPremium.isSelected ||
@@ -201,6 +224,10 @@ class CcideaConfigurable : Configurable {
         s.claudeConfigDir = claudeDir.text.trim()
         s.offlineOnly = offline.isSelected
         s.customTokenLimit = customLimit.text.trim().toLongOrNull()?.coerceAtLeast(0) ?: 0L
+        s.weeklyTokenLimit = weeklyTokenLimit.text.trim().toLongOrNull()?.coerceAtLeast(0) ?: 0L
+        s.weeklyCostLimit = weeklyCostLimit.text.trim().toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0
+        s.monthlyTokenLimit = monthlyTokenLimit.text.trim().toLongOrNull()?.coerceAtLeast(0) ?: 0L
+        s.monthlyCostLimit = monthlyCostLimit.text.trim().toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0
         s.showStatusBarWidget = showStatus.isSelected
         s.uiLanguage = (language.selectedItem as? LangItem)?.code ?: "system"
         s.oneHourCachePremium = oneHourPremium.isSelected

@@ -28,7 +28,10 @@ import javax.swing.table.TableRowSorter
  * narrows it down to the current IntelliJ project's slug.
  */
 class LiveTab(private val project: Project) : BaseTab() {
-    private val summary = JBLabel().apply { horizontalAlignment = SwingConstants.LEFT }
+    private val summary = JBLabel().apply {
+        horizontalAlignment = SwingConstants.LEFT
+        verticalAlignment = SwingConstants.TOP
+    }
     private val model = LiveMessageTableModel()
     private val table = JBTable(model).apply {
         rowSorter = TableRowSorter(model)
@@ -36,36 +39,47 @@ class LiveTab(private val project: Project) : BaseTab() {
         TableSetup.applyToken(this, 4)
         TableSetup.applyCost(this, 5)
     }
-    private var onlyCurrentProject = false
-    private val scopeToggle = javax.swing.JCheckBox("仅当前项目", false).apply {
+    private var onlyCurrentProject = true
+    private val scopeToggle = javax.swing.JCheckBox(ccideaMsg("live.scope.currentProject"), true).apply {
         toolTipText = "勾选后只显示当前 IDE 项目的活动；不勾选则显示所有来源（多个 IDE / CLI / Antigravity 等）"
         addActionListener {
             onlyCurrentProject = isSelected
-            onRefresh()
+            onRefresh(forced = true)
         }
     }
+    private val quotaPanel = QuotaPanel()
 
     init {
         addToolbarComponent(ColumnFilterButton(table).component)
         addToolbarComponent(scopeToggle)
         val north = JPanel(BorderLayout())
-        north.preferredSize = Dimension(0, 60)
-        north.add(summary, BorderLayout.CENTER)
+        val summaryWrap = JPanel(BorderLayout()).apply {
+            preferredSize = Dimension(0, 92)
+            add(summary, BorderLayout.CENTER)
+        }
+        north.add(summaryWrap, BorderLayout.NORTH)
+        north.add(quotaPanel, BorderLayout.CENTER)
         add(north, BorderLayout.NORTH)
         add(JBScrollPane(table), BorderLayout.CENTER)
-        onRefresh()
+        onRefresh(forced = true)
     }
 
     private fun expectedSlug(): String? {
         val base = project.basePath ?: return null
         val abs = runCatching { Paths.get(base).toAbsolutePath().toString() }.getOrNull() ?: return null
-        return abs.replace('/', '-')
+        // Claude Code slugifies the absolute path by replacing every character that isn't
+        // [A-Za-z0-9.] with '-'. A naive '/'→'-' replacement breaks for paths containing
+        // non-ASCII segments (e.g. CJK directory names) — those characters become runs of '-'
+        // on disk, so we must mirror the same rule here to recognise the current project.
+        return abs.map { ch ->
+            if (ch.isLetterOrDigit() && ch.code < 128 || ch == '.') ch else '-'
+        }.joinToString("")
     }
 
     private fun matchesCurrentProject(slug: String, entry: UsageEntry): Boolean =
         entry.projectKey == slug || slug.endsWith("-${entry.projectKey}") || entry.projectKey.endsWith(slug)
 
-    override fun onRefresh() {
+    override fun onRefresh(forced: Boolean) {
         val slug = expectedSlug()
         val all = BlockService.getInstance().all()
         val matches = if (onlyCurrentProject && slug != null)
@@ -75,15 +89,18 @@ class LiveTab(private val project: Project) : BaseTab() {
         val recent = matches.sortedByDescending { it.timestamp }.take(200)
         TableSetup.preservingSort(table) { model.setRows(recent) }
         summary.text = renderSummary(slug, matches)
+        quotaPanel.refresh()
     }
 
     private fun renderSummary(slug: String?, all: List<UsageEntry>): String {
+        val scopeName = if (onlyCurrentProject && slug != null)
+            ProjectKeyFormat.shortName(slug)
+        else ccideaMsg("live.scope.allSources")
+
         if (all.isEmpty()) {
-            val scopeLabel = if (onlyCurrentProject && slug != null)
-                "<b>${ProjectKeyFormat.shortName(slug)}</b> · "
-            else ""
-            return "<html>$scopeLabel<i>${ccideaMsg("live.noActivity")}</i></html>"
+            return "<html><div style='padding:6px 4px;'><b>$scopeName</b> · <i>${ccideaMsg("live.noActivity")}</i></div></html>"
         }
+
         val pricing = PricingService.getInstance()
         val totalCost = all.sumOf { pricing.costFor(it).total }
         val totalTokens = all.sumOf { it.totalTokens }
@@ -92,22 +109,41 @@ class LiveTab(private val project: Project) : BaseTab() {
         val recentCount = recentEntries.size
         val recentTokens = recentEntries.sumOf { it.totalTokens }
         val recentCost = recentEntries.sumOf { pricing.costFor(it).total }
-        val distinctProjects = all.map { it.projectKey }.toSet().size
-        val parts = mutableListOf<String>()
-        parts += if (onlyCurrentProject && slug != null)
-            "<b>${ProjectKeyFormat.shortName(slug)}</b>"
-        else "<b>全部来源</b> · ${distinctProjects} 个项目"
-        parts += "${all.size} ${ccideaMsg("live.totalMessages")}"
-        parts += Format.tokens(totalTokens)
-        parts += Format.cost(totalCost)
-        if (recentEntries.isNotEmpty()) {
-            parts += ccideaMsg("blocks.summary.per5min", Format.cost(recentCost / 12.0))
-            parts += ccideaMsg("blocks.summary.perHour", Format.cost(recentCost))
+
+        // Active sessions = distinct sessionIds touched within last 1h
+        val activeSessions = recentEntries.map { it.sessionId }.toSet().size
+
+        // Avg per hour over the lifetime span (min 1h to avoid divide-by-tiny-window spikes)
+        val firstTs = all.minOf { it.timestamp }
+        val spanHours = (Duration.between(firstTs, Instant.now()).toMillis() / 3_600_000.0).coerceAtLeast(1.0)
+        val avgCostPerHour = totalCost / spanHours
+        val avgTokensPerHour = (totalTokens / spanHours).toLong()
+
+        val cards = listOf(
+            ccideaMsg("live.card.activeSessions") to activeSessions.toString(),
+            ccideaMsg("live.card.totalMessages") to all.size.toString(),
+            ccideaMsg("live.card.totalTokens") to Format.tokens(totalTokens),
+            ccideaMsg("live.card.totalCost") to Format.cost(totalCost),
+            ccideaMsg("live.card.rateLast1h") to "$recentCount · ${Format.tokens(recentTokens)} · ${Format.cost(recentCost)}",
+            ccideaMsg("live.card.avgCostPerHour") to Format.cost(avgCostPerHour),
+            ccideaMsg("live.card.avgTokensPerHour") to Format.tokens(avgTokensPerHour),
+        )
+
+        val cardCells = cards.joinToString("") { (label, value) ->
+            "<td valign='top' style='padding:4px 10px; border-left:1px solid #44474a;'>" +
+                "<div style='color:#9aa0a6; font-size:10px; font-weight:normal;'>$label</div>" +
+                "<div style='color:#e8eaed; font-size:14px; font-weight:bold; padding-top:2px;'>$value</div>" +
+            "</td>"
         }
-        if (recentCount > 0) {
-            parts += "${ccideaMsg("live.last1h")}: $recentCount · ${Format.tokens(recentTokens)}"
-        }
-        return "<html>" + parts.joinToString(" · ") + "</html>"
+
+        return "<html>" +
+            "<div style='padding:4px;'>" +
+                "<div style='color:#9aa0a6; font-size:11px; padding:0 0 4px 6px;'><b>$scopeName</b></div>" +
+                "<table cellspacing='0' cellpadding='0' style='border:1px solid #44474a;'>" +
+                    "<tr>$cardCells</tr>" +
+                "</table>" +
+            "</div>" +
+            "</html>"
     }
 }
 

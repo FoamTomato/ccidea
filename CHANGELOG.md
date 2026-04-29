@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — Quota panel & misc fixes
+
+- 实时标签页新增订阅额度面板（5h 块 / 本周 / 本月）：默认本地推算，后台异步查询 Anthropic `/api/oauth/usage` 接口拿到真实订阅利用率后自动替换；失败/限流时静默回退本地推算，永不显示错误提示。
+- 跨进程缓存：官方接口数据写入 `~/.claude/ccidea-quota-cache.json`，多个 IDE 实例共享一次拉取（FileLock 协调），5 分钟软刷新 / 10 分钟硬过期 / 失败 10 分钟冷却，避免触发 rate limit。
+- 设置页新增周/月 Token 与美元额度上限，可配置后画进度条；未配置时只显示用量。
+- 修复中文路径下「仅当前项目」匹配失败：Claude Code 把非 ASCII 字符 slug 化为 `-`，`expectedSlug()` 现在按同样规则计算。
+- `BlockService.ingest` 增加按 `messageId:requestId` 兜底去重，防止 Claude Code CLI 偶发的同条记录双写。
+- Patterns 标签图表 2 分钟节流：避免 30s 周期 tick 反复重建 Lets-Plot 组件造成的视觉闪烁；首次进入和手动刷新仍立即重画。
+
 ## 0.3.3 — Sane notifications
 
 - 区块用量告警默认关闭：自动检测的"token 限额"在多 IDE/CLI 同时使用场景下不可靠（取的是历史最高用量），会出现 123% 这种虚假百分比。仅当用户在设置里手动配置 `customTokenLimit` 或显式开启 `enableBlockNotifications` 时才告警。

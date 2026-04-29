@@ -88,7 +88,7 @@ class PollerService : Disposable {
             ApplicationManager.getApplication().invokeLater(
                 {
                     ApplicationManager.getApplication().messageBus
-                        .syncPublisher(CcideaBus.TOPIC).refreshed(at)
+                        .syncPublisher(CcideaBus.TOPIC).refreshed(at, forced)
                 },
                 ModalityState.any()
             )

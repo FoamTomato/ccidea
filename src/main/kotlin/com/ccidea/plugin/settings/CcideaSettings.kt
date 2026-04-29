@@ -20,6 +20,12 @@ class CcideaSettings : PersistentStateComponent<CcideaSettings.State> {
         var currencyDisplay: String = "USD",
         var offlineOnly: Boolean = false,
         var customTokenLimit: Long = 0,
+        /** Optional weekly/monthly quota caps for the LiveTab quota panel.
+         *  Token caps win over USD caps when both are set. 0 = not configured. */
+        var weeklyTokenLimit: Long = 0,
+        var weeklyCostLimit: Double = 0.0,
+        var monthlyTokenLimit: Long = 0,
+        var monthlyCostLimit: Double = 0.0,
         /** Block-usage notifications (80%/95%/reset-soon). Off by default — the auto
          *  detected token limit is unreliable when usage spans multiple IDEs/CLIs. */
         var enableBlockNotifications: Boolean = false,

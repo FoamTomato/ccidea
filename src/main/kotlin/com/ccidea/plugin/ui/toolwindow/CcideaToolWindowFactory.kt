@@ -41,7 +41,7 @@ class CcideaToolWindowFactory : ToolWindowFactory {
         // Re-label the tabs when the user changes uiLanguage (signaled via CcideaBus.refreshed).
         val conn = ApplicationManager.getApplication().messageBus.connect(content)
         conn.subscribe(CcideaBus.TOPIC, object : RefreshListener {
-            override fun refreshed(at: Instant) {
+            override fun refreshed(at: Instant, forced: Boolean) {
                 tabs.setTitleAt(0, ccideaMsg("toolwindow.tab.live"))
                 tabs.setTitleAt(1, ccideaMsg("toolwindow.tab.daily"))
                 tabs.setTitleAt(2, ccideaMsg("toolwindow.tab.monthly"))

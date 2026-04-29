@@ -80,13 +80,21 @@ class PatternEngine {
         val out = mutableListOf<Recommendation>()
 
         // 0. Always-on overview — gives users a useful summary even when no patterns trigger.
+        //    Includes a 7d window so heavy long-time users still see recent movement, not just lifetime totals.
+        val nowInstant = Instant.now()
+        val weekAgo = nowInstant.minus(Duration.ofDays(7))
         val totalCostAll = sessions.sumOf { it.cost }
         val totalTokensAll = entries.sumOf { it.totalTokens }
+        val recentEntries = entries.filter { it.timestamp >= weekAgo }
+        val recentCost = recentEntries.sumOf { pricing.costFor(it).total }
+        val recentTokens = recentEntries.sumOf { it.totalTokens }
+        val recentSessionIds = recentEntries.map { it.sessionId }.toSet()
         out += Recommendation(
             severity = Severity.INFO,
             title = "使用概览",
-            detail = "共 ${sessions.size} 个会话，${entries.size} 条调用，累计 ${formatTokens(totalTokensAll)} tokens，总花费 $%.2f。"
-                .format(totalCostAll)
+            detail = ("共 ${sessions.size} 个会话，${entries.size} 条调用，累计 ${formatTokens(totalTokensAll)} tokens，总花费 $%.2f。" +
+                "近 7 天 ${recentSessionIds.size} 个会话、${formatTokens(recentTokens)} tokens、$%.2f。")
+                .format(totalCostAll, recentCost)
         )
 
         // 1. Low cache hit ratio per model.
@@ -102,14 +110,20 @@ class PatternEngine {
         }
 
         // 2. Opus cost share — heavy Opus reliance suggests downshift opportunities.
-        val opusSessions = sessions.filter { s -> s.models.any { it.contains("opus", ignoreCase = true) } }
-        val totalCost = sessions.sumOf { it.cost }
-        val opusCostShare = if (totalCost > 0) opusSessions.sumOf { it.cost } / totalCost else 0.0
-        if (opusCostShare > 0.6 && opusSessions.size >= 3) {
+        //    Counted at entry granularity over the last 7 days: a session that mostly used Sonnet
+        //    with one Opus call no longer pollutes the Opus bucket, and stale history doesn't pin the hint forever.
+        val recentOpusCost = recentEntries
+            .filter { it.model.contains("opus", ignoreCase = true) }
+            .sumOf { pricing.costFor(it).total }
+        val recentOpusSessions = recentEntries
+            .filter { it.model.contains("opus", ignoreCase = true) }
+            .map { it.sessionId }.toSet()
+        val recentOpusShare = if (recentCost > 0) recentOpusCost / recentCost else 0.0
+        if (recentOpusShare > 0.6 && recentOpusSessions.size >= 3) {
             out += Recommendation(
                 severity = Severity.HINT,
                 title = "Opus 占用较高",
-                detail = "Opus 占总成本 ${(opusCostShare * 100).toInt()}%（共 ${opusSessions.size} 个会话）。" +
+                detail = "近 7 天 Opus 占成本 ${(recentOpusShare * 100).toInt()}%（共 ${recentOpusSessions.size} 个会话）。" +
                     "对短改动/简单任务可改用 Sonnet 以降低成本。"
             )
         }
@@ -153,32 +167,31 @@ class PatternEngine {
             }
         }
 
-        // 6. High output-to-input ratio — usually indicates verbose responses.
-        val totalInput = entries.sumOf { it.inputTokens }
-        val totalOutput = entries.sumOf { it.outputTokens }
-        if (totalInput > 100_000 && totalOutput > totalInput * 2) {
+        // 6. High output-to-context ratio — usually indicates verbose responses.
+        //    Denominator counts the real context fed to the model (input + cache_read + cache_create);
+        //    raw inputTokens alone is near-zero under heavy prompt caching, which made the old check fire constantly.
+        //    Scoped to the last 7 days so old habits don't dominate the signal.
+        val recentInputCtx = recentEntries.sumOf { it.inputTokens + it.cacheRead + it.cacheCreationTotal }
+        val recentOutput = recentEntries.sumOf { it.outputTokens }
+        if (recentInputCtx > 1_000_000 && recentOutput > recentInputCtx * 0.15) {
             out += Recommendation(
                 severity = Severity.HINT,
                 title = "输出量明显高于输入",
-                detail = "输出/输入 ≈ %.1f×。可考虑要求更简洁的回答，或减少不必要的总结。"
-                    .format(totalOutput.toDouble() / totalInput)
+                detail = "近 7 天输出/上下文 ≈ %.1f%%（含缓存读取与写入）。可考虑要求更简洁的回答，或减少不必要的总结。"
+                    .format(recentOutput.toDouble() / recentInputCtx * 100)
             )
         }
 
         // 7. Recent activity surge — last 24h cost > 30% of last 7d cost.
-        val now = Instant.now()
-        val day = now.minus(Duration.ofDays(1))
-        val week = now.minus(Duration.ofDays(7))
+        val day = nowInstant.minus(Duration.ofDays(1))
         val last24hCost = entries.filter { it.timestamp >= day }
             .sumOf { pricing.costFor(it).total }
-        val last7dCost = entries.filter { it.timestamp >= week }
-            .sumOf { pricing.costFor(it).total }
+        val last7dCost = recentCost
         if (last7dCost > 5.0 && last24hCost / last7dCost > 0.30) {
             out += Recommendation(
                 severity = Severity.WARN,
                 title = "近 24 小时使用量上升",
-                detail = "近 24 小时花费 $%.2f，占近 7 天的 ${(last24hCost / last7dCost * 100).toInt()}%。"
-                    .format(last24hCost)
+                detail = "近 24 小时花费 $${"%.2f".format(last24hCost)}，占近 7 天的 ${(last24hCost / last7dCost * 100).toInt()}%。"
             )
         }
 

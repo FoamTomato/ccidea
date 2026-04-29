@@ -36,6 +36,10 @@ class PatternsTab : BaseTab() {
     private val heatmap = ChartPanel(this)
     private val hitRatio = ChartPanel(this)
 
+    /** When the charts were last repainted. Idle 30s ticks reuse the previous render
+     *  unless this is older than [CHART_THROTTLE]; user-initiated refreshes always rebuild. */
+    private var lastChartRenderAt: java.time.Instant? = null
+
     init {
         addToolbarComponent(ColumnFilterButton(outliersTable).component)
         val charts = JPanel(GridLayout(1, 2, 8, 0))
@@ -52,10 +56,17 @@ class PatternsTab : BaseTab() {
             resizeWeight = 0.6; isContinuousLayout = true; border = null
         }
         add(split, BorderLayout.CENTER)
-        onRefresh()
+        // First show: paint everything, including charts.
+        onRefresh(forced = true)
+        // When the user actually scrolls/clicks into this tab after a hidden period,
+        // refresh charts once so they don't remain stale forever.
+        addHierarchyListener { e ->
+            if (e.changeFlags and java.awt.event.HierarchyEvent.SHOWING_CHANGED.toLong() != 0L
+                && isShowing) onRefresh(forced = true)
+        }
     }
 
-    override fun onRefresh() {
+    override fun onRefresh(forced: Boolean) {
         val report = PatternEngine.getInstance().report(ZoneId.systemDefault())
         recommendationsArea.text = renderRecommendations(report.recommendations)
         TableSetup.preservingSort(outliersTable) {
@@ -64,8 +75,22 @@ class PatternsTab : BaseTab() {
         val s = com.ccidea.plugin.settings.CcideaSettings.getInstance().state
         heatmap.isVisible = s.showPatternsHeatmap
         hitRatio.isVisible = s.showPatternsHitRatio
+        // Charts are expensive (Lets-Plot rebuild + Swing component swap). On idle 30s
+        // ticks we throttle them to CHART_THROTTLE so they still update over time without
+        // flickering every half minute. User-initiated refreshes (toolbar button, tab
+        // show events) always bypass the throttle.
+        val now = java.time.Instant.now()
+        val last = lastChartRenderAt
+        val throttled = !forced && last != null &&
+            java.time.Duration.between(last, now) < CHART_THROTTLE
+        if (throttled) return
         if (s.showPatternsHeatmap) heatmap.render { Charts.activityHeatmap(report.heatmap) }
         if (s.showPatternsHitRatio) hitRatio.render { Charts.cacheHitRatioBar(report.modelHitRatios) }
+        lastChartRenderAt = now
+    }
+
+    companion object {
+        private val CHART_THROTTLE: java.time.Duration = java.time.Duration.ofMinutes(2)
     }
 
     private fun renderRecommendations(items: List<Recommendation>): String {
