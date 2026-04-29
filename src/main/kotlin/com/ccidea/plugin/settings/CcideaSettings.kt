@@ -20,6 +20,11 @@ class CcideaSettings : PersistentStateComponent<CcideaSettings.State> {
         var currencyDisplay: String = "USD",
         var offlineOnly: Boolean = false,
         var customTokenLimit: Long = 0,
+        /** Block-usage notifications (80%/95%/reset-soon). Off by default — the auto
+         *  detected token limit is unreliable when usage spans multiple IDEs/CLIs. */
+        var enableBlockNotifications: Boolean = false,
+        /** Auto-expire toast notifications after this many seconds (0 = no auto-close). */
+        var notificationAutoCloseSeconds: Int = 60,
         var showStatusBarWidget: Boolean = true,
         /** "system" | "en" | "zh" — controls which CcideaBundle locale the UI reads. */
         var uiLanguage: String = "system",

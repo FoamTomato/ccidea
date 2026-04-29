@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3 — Sane notifications
+
+- 区块用量告警默认关闭：自动检测的"token 限额"在多 IDE/CLI 同时使用场景下不可靠（取的是历史最高用量），会出现 123% 这种虚假百分比。仅当用户在设置里手动配置 `customTokenLimit` 或显式开启 `enableBlockNotifications` 时才告警。
+- 通知 toast 默认 60 秒后自动关闭（可在设置中调整 `notificationAutoCloseSeconds`，0 = 不自动关）。
+
 ## 0.3.2 — Live tab shows all sources
 
 - 实时标签页默认显示所有来源（多个 IDE / CLI / Antigravity 等）的活动，不再只显示当前 IDE 项目。

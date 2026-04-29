@@ -24,9 +24,13 @@ class CcideaNotifier {
 
     fun evaluate(block: SessionBlock?, limit: Long, now: Instant = Instant.now()) {
         if (block == null || !block.isActive || limit <= 0) return
+        val settings = CcideaSettings.getInstance().state
+        // Notifications are off by default — the auto-detected limit is unreliable.
+        // Only fire when a custom limit is set, OR the user explicitly enabled them.
+        if (!settings.enableBlockNotifications && settings.customTokenLimit <= 0) return
+
         val s = byBlock.computeIfAbsent(block.startTime) { State() }
         val pct = block.totalTokens.toDouble() / limit.toDouble()
-        val settings = CcideaSettings.getInstance().state
 
         if (pct >= settings.errorPercent / 100.0 && !s.warned95) {
             notify(NotificationType.ERROR,
@@ -54,10 +58,17 @@ class CcideaNotifier {
     }
 
     private fun notify(type: NotificationType, title: String, content: String) {
-        NotificationGroupManager.getInstance()
+        val notification = NotificationGroupManager.getInstance()
             .getNotificationGroup("ccidea.balloon")
             .createNotification(title, content, type)
-            .notify(null)
+        notification.notify(null)
+        val autoCloseSec = CcideaSettings.getInstance().state.notificationAutoCloseSeconds
+        if (autoCloseSec > 0) {
+            ApplicationManager.getApplication().executeOnPooledThread {
+                try { Thread.sleep(autoCloseSec * 1000L) } catch (_: InterruptedException) { return@executeOnPooledThread }
+                ApplicationManager.getApplication().invokeLater { notification.expire() }
+            }
+        }
     }
 
     companion object {
